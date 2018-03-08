@@ -9,17 +9,32 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #define MAXLEN 8192
+#define RIO_BUFSIZE 8192
+
+/* rio_t */
+typedef struct{
+    int rio_fd;
+    int rio_cnt;
+    char *rio_bufptr;
+    char rio_buf[RIO_BUFSIZE];
+} rio_t;
+/* rio_t */
 
 /* begin error handle function */
 void unix_error(char *message);
 void gai_error(int r, char *message);
 /* end error handle function */
 
-/* begin file descriptor */
+/* begin RIO */
 int Close(int fd);
-/* end file descriptor */
+void Rio_readinitb(rio_t *rp, int fd);
+ssize_t Rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen);
+void Rio_writen(int fd, void * usrbuf, size_t n);
+/* end RIO */
 
 /* begin network programming */
 int Setsockopt(int socket, int level, int optname, const void *optval, socklen_t optlen);

@@ -2,24 +2,127 @@
 
 /* start error function */
 void unix_error(char *message){
-    fprintf(stderr, "%s: %s\n", message, strerror(errno));
+    fprintf(stderr, "%s : %s\n", message, strerror(errno));
     exit(0);
 }
 
 void gai_error(int r, char *message){
-    fprintf(stderr, "%s: %s\n", message, gai_strerror(r));
+    fprintf(stderr, "%s : %s\n", message, gai_strerror(r));
     exit(0);
 }
 /* end error function */
 
-/* start file descriptor */
+/* start RIO */
 int Close(int fd){
     int r;
     if((r = close(fd)) != 0){
         unix_error("Close fail");
     }
 }
-/* end file descriptor */
+
+void rio_readinitb(rio_t *rp, int fd){
+    rp->rio_fd = fd;
+    rp->rio_cnt = 0;
+    rp->rio_bufptr = rp->rio_buf;
+}
+
+void Rio_readinitb(rio_t *rp, int fd){
+    rio_readinitb(rp, fd);
+}
+
+static ssize_t rio_read(rio_t *rp, char *usrbuf, size_t n){
+    int cnt;
+    
+    while(rp->rio_cnt <= 0){
+        rp->rio_cnt = read(rp->rio_fd, rp->rio_buf, sizeof(rp->rio_buf));
+        if(rp->rio_cnt < 0){
+            if(errno != EINTR){
+                return -1;
+            }
+        }
+        else if(rp->rio_cnt == 0){
+            return 0;
+        }
+        else{
+            rp->rio_bufptr = rp->rio_buf;
+        }
+    }
+    cnt = n;
+    if(rp->rio_cnt < n){
+        cnt = rp->rio_cnt;
+    }
+    memcpy(usrbuf, rp->rio_bufptr, cnt);
+    rp->rio_bufptr = rp->rio_bufptr + cnt;
+    rp->rio_cnt = rp->rio_cnt - cnt;
+    return cnt;
+}
+
+/* begin rio_writen */
+ssize_t rio_writen(int fd, void *usrbuf, size_t n){
+    char *pbuf = usrbuf;
+    ssize_t nwritten;
+    size_t nleft = n;
+
+    while(nleft > 0){
+        if((nwritten = write(fd, pbuf, nleft)) < 0){
+            if(errno == EINTR){
+                nwritten = 0;
+            }
+            else{
+                return -1;
+            }
+        }
+        nleft = nleft - nwritten;
+        pbuf = pbuf + nwritten;
+    }
+
+    return n;
+}
+/* end rio_writen*/
+
+/* begin Rio_writen */
+void Rio_writen(int fd, void *usrbuf, size_t n){
+    if(rio_writen(fd, usrbuf, n) != n){
+        unix_error("Rio_writen");
+    }
+}
+/* end Rio_writen*/
+
+ssize_t rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen){
+    int n, rc;
+    char c, *pbuf = usrbuf;
+    for(n = 1; n < maxlen; n++){
+        if((rc = rio_read(rp, &c, 1)) == 1){
+            *pbuf++ = c;
+            if(c == '\n'){
+                n++;
+                break;
+            }
+        }
+        else if(rc == 0){
+            if(n == 1){
+                return 0;
+            }
+            else{
+                break;
+            }
+        }
+        else{
+            return -1;
+        }
+    }
+    *pbuf = '\0';
+    return n-1;
+}
+
+ssize_t Rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen){
+    ssize_t r;
+    if((r = rio_readlineb(rp, usrbuf, maxlen)) < 0){
+        unix_error("Rio_readlineb");
+    }
+    return r;
+}
+/* end RIO */
 
 /* start network programming */
 int Setsockopt(int socket, int level, int optname, const void *optval, socklen_t optlen){
@@ -88,10 +191,10 @@ int open_listenfd(char *port){
 
 int Open_listenfd(char *port){
     int r;
-    if(r = open_listenfd(port) < 0){
-        unix_error("Open_listenfd fail.");
-        return r;
+    if((r = open_listenfd(port)) < 0){
+        unix_error("Open_listenfd fail");
     }
+    return r;
 }
 
 int Accept(int listenfd, struct sockaddr *addr, int *addrlen){
