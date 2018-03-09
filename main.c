@@ -3,7 +3,9 @@
 void doit(int fd);
 void clienterror(int fd, char *errnum, char *shortmes, char *longmes, char *cause);
 void read_request(rio_t *rp);
-
+int parse_uri(char *uri, char *filename, char *cgiargs);
+void static_server(int fd, char *filename, int filesize);
+void get_filetype(char *filename, char *filetype);
 
 int main(int argc, char **argv){
     int listenfd, connfd;
@@ -33,6 +35,7 @@ void doit(int fd){
     int is_static;
     rio_t rio;
     char buf[MAXLEN], method[MAXLEN], uri[MAXLEN], version[MAXLEN];
+    char filename[MAXLEN], cgiargs[MAXLEN];
     struct stat sbuf;
 
     /* Read request line and header */
@@ -45,18 +48,77 @@ void doit(int fd){
     sscanf(buf, "%s %s %s", method, uri, version);
     /* request method */
     if(strcasecmp(method, "GET")){
-        clienterror(fd, "501", "Not Implement", "Not Implement.", method);
+        clienterror(fd, "501", "Not Implement", "Not implement this method ", method);
         return;
     }
     read_request(&rio);
     /* request uri */
     is_static = parse_uri(uri, filename, cgiargs);
-    
-    
+    if(stat(filename, &sbuf) < 0){
+        clienterror(fd, "404", "Not Found", "Not found the file ", filename);
+        return;
+    }
+    /* static or dynamic server */
+    if(is_static){
+        if(!(S_ISREG(sbuf.st_mode)) || !(sbuf.st_mode & S_IRUSR)){
+            clienterror(fd, "403", "Forbidden", "Refuse this request ", filename);
+            return;
+        }
+        static_server(fd, filename, sbuf.st_size);
+    }
+    else{
+
+    }
 }
 
+/* Begin get_filetype */
+void get_filetype(char *filename, char *filetype){
+    if(strstr(filename, ".html")){
+        strcpy(filetype, "text/html");
+    }
+    else if(strstr(filename, ".gif")){
+        strcpy(filetype, "image/gif");
+    }
+    else if(strstr(filename, ".png")){
+        strcpy(filetype, "image/png");
+    }
+    else if(strstr(filename, ".jpg")){
+        strcpy(filetype, "image/jpg");
+    }
+    else {
+        strcpy(filetype, "text/plain");
+    }
+}
+/* End get_filetype */
+
+/* begin static server */
+void static_server(int fd, char *filename, int filesize){
+    
+    char buf[MAXLEN], filetype[MAXLEN];
+    char *srcp;
+    int srcfd;
+ 
+    /* Send response headers to client */
+    get_filetype(filename, filetype);
+    sprintf(buf, "HTTP/1.1 200 OK\r\n");
+    sprintf(buf, "%sServer : xuanlan\r\n", buf);
+    sprintf(buf, "%sContent-Type : %s\r\n", buf, filetype);
+    sprintf(buf, "%sContent-Size : %d\r\n\r\n", buf, filesize);
+    Rio_writen(fd, buf, strlen(buf));
+    /* print response headers to server */
+    fprintf(stdout, "Response headers : \n%s",buf);
+
+    /* Send response body to client */
+    srcfd = Open(filename, O_RDONLY, 0);
+    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+    Close(srcfd);
+    Rio_writen(fd, srcp, filesize);
+    Munmap(srcp, filesize);  
+}
+/* end static server */
+
 /* begin parse_uri */
-int parse_uri(char *uri, char filename, char *cgiargs){
+int parse_uri(char *uri, char *filename, char *cgiargs){
 
     char *ptr;
 
@@ -65,7 +127,7 @@ int parse_uri(char *uri, char filename, char *cgiargs){
         strcpy(cgiargs, "");
         strcpy(filename, ".");
         strcat(filename, uri);
-        if(uri[strlen(uri) - 1] == "/"){
+        if(uri[strlen(uri) - 1] == '/'){
             strcat(filename, "home.html");
         }
         return 1;
@@ -103,14 +165,16 @@ void read_request(rio_t *rp){
 
 /* begin clienterror */
 void clienterror(int fd, char *errnum, char *shortmes, char *longmes, char *cause){
-    char body[MAXLEN];
-    
+    char body[MAXLEN], buf[MAXLEN];
+    /* Bulid response headers*/ 
+    sprintf(buf, "HTTP/1.1 %s %s\r\n", errnum, shortmes);
+    sprintf(buf, "%scontent-type : text/html\r\n\r\n", buf);
+    Rio_writen(fd, buf, strlen(buf));
     /* bulid response body */
     sprintf(body, "<html><title>Server Error</title>");
     sprintf(body, "%s<body bgcolor=ffffff>\r\n", body);
-    sprintf(body, "%s%s : %s\r\n", body, errnum, shortmes);
-    sprintf(body, "%s%s : %s\r\n", body, longmes, cause);   
-
+    sprintf(body, "%s<h1 style=\"text-align:center\">%s : %s</h1>\r\n<hr>\r\n", body, errnum, shortmes);
+    sprintf(body, "%s<h2 style=\"text-align:center\">%s : %s</h2>\r\n", body, longmes, cause);   
     Rio_writen(fd, body, strlen(body));
 }
 /* end clienterror */

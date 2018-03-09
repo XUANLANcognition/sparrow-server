@@ -13,11 +13,39 @@ void gai_error(int r, char *message){
 /* end error function */
 
 /* start RIO */
+int Open(const char *pathname, int flags, mode_t mode){
+    int r;
+    if((r = open(pathname, flags, mode)) < 0){
+        unix_error("Open error");
+    } 
+    return r;  
+}
+
 int Close(int fd){
     int r;
     if((r = close(fd)) != 0){
         unix_error("Close fail");
     }
+}
+
+void *Mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset){
+
+    void *r;
+
+    if((r = mmap(addr, length, prot, flags, fd, offset)) == ((void *) - 1)){
+        unix_error("Mmap error");
+    }
+    return r;
+}
+
+int Munmap(void *addr, size_t length){
+
+    int r;
+
+    if((r = munmap(addr, length)) < 0){
+        unix_error("Munmap error");
+    }
+    return r;
 }
 
 void rio_readinitb(rio_t *rp, int fd){

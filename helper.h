@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 #define MAXLEN 8192
 #define RIO_BUFSIZE 8192
@@ -30,7 +31,10 @@ void gai_error(int r, char *message);
 /* end error handle function */
 
 /* begin RIO */
+int Open(const char *pathname, int flags, mode_t mode);
 int Close(int fd);
+int Munmap(void *addr, size_t length);
+void *Mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 void Rio_readinitb(rio_t *rp, int fd);
 ssize_t Rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen);
 void Rio_writen(int fd, void * usrbuf, size_t n);
