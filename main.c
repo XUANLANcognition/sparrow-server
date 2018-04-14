@@ -85,6 +85,9 @@ void get_filetype(char *filename, char *filetype){
     else if(strstr(filename, ".jpg")){
         strcpy(filetype, "image/jpg");
     }
+    else if(strstr(filename, ".pdf")){
+        strcpy(filetype, "application/pdf");
+    }
     else {
         strcpy(filetype, "text/plain");
     }
