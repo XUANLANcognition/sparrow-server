@@ -6,12 +6,14 @@ void read_request(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
 void static_server(int fd, char *filename, int filesize);
 void get_filetype(char *filename, char *filetype);
+void *thread(void *vargp);
 
 int main(int argc, char **argv){
-    int listenfd, connfd;
+    int listenfd, connfd, *connfdp;
     char hostname[MAXLEN], port[MAXLEN];
     struct sockaddr_storage clientaddr;
     socklen_t clientlen;
+    pthread_t tid;
     /* Check command-line args */
     if (argc != 2){
         fprintf(stderr, "usage : %s <port>\n", argv[0]);
@@ -21,12 +23,22 @@ int main(int argc, char **argv){
     listenfd = Open_listenfd(argv[1]);
     while(1){
         clientlen = sizeof(clientaddr);
-        connfd = Accept(listenfd, (struct sockaddr *)&clientaddr, &clientlen);
+        connfdp = malloc(sizeof(int));
+        *connfdp = Accept(listenfd, (struct sockaddr *)&clientaddr, &clientlen);
         Getnameinfo((struct sockaddr *)&clientaddr, clientlen, hostname, MAXLEN, port, MAXLEN, 0);
         fprintf(stdout, "Accepted connection from (%s : %s)\n", hostname, port);
-        doit(connfd);
-        Close(connfd);
+        pthread_create(&tid, NULL, thread, connfdp);
     }
+    /* begin thread routine */
+}
+
+void *thread(void *vargp){
+    int connfd = *((int *)vargp);
+    pthread_detach(pthread_self());
+    free(vargp);
+    doit(connfd);
+    Close(connfd);
+    return NULL;
 }
 
 void doit(int fd){
