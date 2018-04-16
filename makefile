@@ -3,3 +3,4 @@ main : helper.o main.o
 	gcc -o p helper.o main.o -lpthread
 clean :
 	rm *.o
+	p
