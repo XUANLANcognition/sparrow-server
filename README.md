@@ -1,2 +1,2 @@
 # sparrow server
-## Thanks to deep learn opearting computer system.
+## Thanks to Computer System : A Programmers' Perspective.
