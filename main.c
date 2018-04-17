@@ -5,6 +5,7 @@ void clienterror(int fd, char *errnum, char *shortmes, char *longmes, char *caus
 void read_request(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
 void static_server(int fd, char *filename, int filesize);
+void dynamic_server(int fd, char *filename, char *cgiargs);
 void get_filetype(char *filename, char *filetype);
 void *thread(void *vargp);
 
@@ -79,7 +80,11 @@ void doit(int fd){
         static_server(fd, filename, sbuf.st_size);
     }
     else{
-
+        if(!(S_ISREG(sbuf.st_mode)) || !(sbuf.st_mode & S_IRUSR)){
+            clienterror(fd, "403", "Forbidden", "Refuse this request ", filename);
+            return;
+        }
+        dynamic_server(fd, filename, cgiargs);
     }
 }
 
@@ -131,6 +136,32 @@ void static_server(int fd, char *filename, int filesize){
     Munmap(srcp, filesize);  
 }
 /* end static server */
+
+/* begin dynamic server */
+void dynamic_server(int fd, char *filename, char *cgiargs){
+    char buf[MAXLEN], *newargs[] = { NULL };
+	int i;
+
+	/* Return first part of HTTP response */
+	sprintf(buf, "HTTP/1.0 200 OK\r\n");
+	Rio_writen(fd, buf, strlen(buf));
+	sprintf(buf, "Server : Tiny Web Server\r\n\r\n");
+	Rio_writen(fd, buf, strlen(buf));
+
+	if(fork() == 0){
+	    /* Real server would set all common gateway interface vars heres */
+		setenv("QUERY_STRING", cgiargs, 1);
+		/* set args */
+		newargs[0] = filename;
+		newargs[1] = cgiargs;
+		newargs[2] = NULL;
+		/* set args */
+		dup2(fd, STDOUT_FILENO);
+		execve(filename, newargs, __environ);
+	}
+	wait(NULL);
+}
+/* end dynamic server */
 
 /* begin parse_uri */
 int parse_uri(char *uri, char *filename, char *cgiargs){

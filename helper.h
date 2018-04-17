@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <pthread.h>
+#include <sys/wait.h>
 
 #define MAXLEN 8192
 #define RIO_BUFSIZE 8192
