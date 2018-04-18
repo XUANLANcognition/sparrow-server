@@ -153,8 +153,16 @@ void dynamic_server(int fd, char *filename, char *cgiargs){
 		setenv("QUERY_STRING", cgiargs, 1);
 		/* set args */
 		newargs[0] = filename;
-		newargs[1] = cgiargs;
-		newargs[2] = NULL;
+		int i = 1;
+		char *p;
+		while((p = strchr(cgiargs, '&')) != NULL){
+		    *p = '\0';
+			newargs[i] = cgiargs;
+			cgiargs = p + 1;
+			i++;
+		}
+		newargs[i] = cgiargs;
+		newargs[i + 1] = NULL;
 		/* set args */
 		dup2(fd, STDOUT_FILENO);
 		execve(filename, newargs, __environ);
